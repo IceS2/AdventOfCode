@@ -1,2 +1,2 @@
 # AdventOfCode
-My AdventOfCode solutions ¯\_(ツ)_/¯
+My AdventOfCode solutions ¯\\_(ツ)_/¯
