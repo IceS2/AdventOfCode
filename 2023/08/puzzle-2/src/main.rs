@@ -125,10 +125,10 @@ impl Map {
 
         println!("Cycles: {:?}", cycles);
 
-        let relevant_nodes_location: Vec<u64> = cycles.iter().map(|c| *c.relevant_nodes.values().min().unwrap() as u64).collect();
-        println!("Relevant nodes: {:?}", relevant_nodes_location);
+        let cycle_lengths: Vec<u64> = cycles.iter().map(|c| c.length as u64).collect();
+        println!("Cycle Lengths: {:?}", cycle_lengths);
 
-        let lcm: u128 = relevant_nodes_location.iter().fold(1, |acc, x| primefactor::u128_lcm(acc, *x as u128));
+        let lcm: u128 = cycle_lengths.iter().fold(1, |acc, x| primefactor::u128_lcm(acc, *x as u128));
         println!("LCM: {}", lcm);
     }
 }
