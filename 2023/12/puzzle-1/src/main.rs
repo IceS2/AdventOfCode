@@ -23,7 +23,7 @@ fn main() {
             .map(|c| c.parse().unwrap())
             .collect();
 
-        sum += solve(row.pop_front(), row, groups, 0);
+        sum += solve(row, groups, 0);
     }
 
     println!("Sum: {:?}", sum);
@@ -35,50 +35,53 @@ where P: AsRef<Path>, {
     Ok(io::BufReader::new(file).lines())
 }
 
-fn solve(c: Option<char>, mut s: VecDeque<char>, mut groups_left: VecDeque<usize>, current_group_size: usize) -> u32 {
+fn solve(mut s: VecDeque<char>, mut groups_left: VecDeque<usize>, current_group_size: usize) -> u32 {
     // println!("Char: {:?}", c);
     // println!("String: {:?}", s);
     // println!("Groups left: {:?}", groups_left);
     // println!("Current group size: {:?}", current_group_size);
-
     if groups_left.is_empty() {
-        return 1;
+        match s.iter().any(|c| c == &'#') {
+            true => return 0,
+            false => return 1
+        }
     }
-    // if groups_left.iter().sum::<usize>() > s.len() {
-    //     return 0;
-    // }
 
-    match c {
+    match s.pop_front() {
         None => {
-            1
+            if groups_left.len() != 1 {
+                0
+            } else if current_group_size == groups_left[0] {
+                1
+            } else {
+                0
+            }
         }
         Some('.') => {
             if current_group_size == 0 {
-                solve(s.pop_front(), s, groups_left, current_group_size)
+                solve(s, groups_left, current_group_size)
             } else if current_group_size == groups_left[0] {
                 groups_left.pop_front();
-                solve(s.pop_front(), s, groups_left, 0)
-            } else if current_group_size != groups_left[0] {
-                0
+                solve(s, groups_left, 0)
             } else {
-                unreachable!()
+                0
             }
         },
         Some('#') => {
-            let current_group_size = current_group_size + 1;
-
-            if current_group_size > groups_left[0] {
-                0
-            } else if current_group_size <= groups_left[0] {
-                solve(s.pop_front(), s, groups_left, current_group_size)
+            if current_group_size <= groups_left[0]{
+                solve(s, groups_left, current_group_size + 1)
             } else {
-                unreachable!()
+                0
             }
-
         },
         Some('?') => {
-            solve(Some('.'), s.clone(), groups_left.clone(), current_group_size) + solve(Some('#'), s, groups_left, current_group_size)
+            let mut s1_clone = s.clone();
+            let mut s2_clone = s.clone();
 
+            s1_clone.push_front('.');
+            s2_clone.push_front('#');
+
+            solve(s1_clone, groups_left.clone(), current_group_size) + solve(s2_clone, groups_left, current_group_size)
         },
         _ => unreachable!()
     }
