@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fs;
+use std::{fs, fmt};
 use std::cmp::Ordering;
 
 fn main() {
@@ -18,22 +18,28 @@ fn main() {
 
     let mut reflector: ParabolicReflector = ParabolicReflector {
         nodes: input,
-        memo: HashMap::new(),
-        visited_states: HashMap::new(),
-        terminal: false
+        cycle: Cycle {
+            visited_states: HashMap::new(),
+            iter: 0,
+            loop_start: 0,
+            loop_length: 0
+        }
     };
 
-    for i in 0..1000000000 {
-    // for i in 0..3 {
-        if reflector.terminal {
-            println!("Iterations: {:?}", i);
+    for _ in 0..1000000000 {
+        reflector.run_cycle();
+        if reflector.cycle.loop_length != 0 {
+            let range_to_final_state = 0..(1000000000 - reflector.cycle.loop_start) % reflector.cycle.loop_length;
+
+            for _ in range_to_final_state {
+                reflector.run_cycle();
+            }
+
             break;
         }
-        reflector.run_cycle();
-        // println!("{:?}", reflector.nodes);
     }
 
-    // let moved_input: Vec<Vec<Node>> = transpose(ParabolicReflector::sort_nodes(transpose(input), SortKind::Ascending));
+    println!("{:#}", reflector);
 
     let input_len: usize = reflector.nodes.len();
     for (row_index, row) in reflector.nodes.iter().enumerate() {
@@ -56,6 +62,14 @@ fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
                 .collect::<Vec<T>>()
         })
         .collect()
+}
+
+#[derive(Debug)]
+struct Cycle {
+    visited_states: HashMap<Vec<Vec<Node>>, usize>,
+    iter: usize,
+    loop_start: usize,
+    loop_length: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -109,59 +123,69 @@ enum Direction {
 #[derive(Debug)]
 struct ParabolicReflector {
     nodes: Vec<Vec<Node>>,
-    memo: HashMap<(Vec<Vec<Node>>, Direction), Vec<Vec<Node>>>,
-    visited_states: HashMap<Vec<Vec<Node>>, bool>,
-    terminal: bool
+    cycle: Cycle,
+}
+
+impl fmt::Display for ParabolicReflector {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for row in &self.nodes {
+            for node in row {
+                match node {
+                    Node::Empty => write!(f, ". ")?,
+                    Node::Fixed => write!(f, "# ")?,
+                    Node::Rock => write!(f, "O ")?
+                };
+            }
+            writeln!(f)?;
+        };
+        write!(f, "")
+    }
 }
 
 impl ParabolicReflector {
     fn run_cycle(&mut self) {
-        if self.visited_states.get(&self.nodes.clone()).is_some() {
-            self.terminal = true;
+        if let Some(cycle_start) = self.cycle.visited_states.get(&self.nodes.clone()) {
+            self.cycle.loop_length = self.cycle.iter - cycle_start;
+            self.cycle.loop_start = *cycle_start;
+            self.cycle.visited_states = HashMap::new();
             return;
         } else {
-            self.visited_states.insert(self.nodes.clone(), true);
+            self.cycle.visited_states.insert(self.nodes.clone(), self.cycle.iter);
         }
 
         self.move_to(Direction::North);
         self.move_to(Direction::West);
         self.move_to(Direction::South);
         self.move_to(Direction::East);
+
+        self.cycle.iter += 1;
     }
 
     fn move_to(&mut self, direction: Direction) {
-        let initial_nodes = self.nodes.clone();
-
-        if let Some(result) = self.memo.get(&(initial_nodes.clone(), direction)) {
-            self.nodes = result.clone();
-        } else {
-            self.nodes = match &direction {
-                    Direction::North => {
-                        transpose(
-                            ParabolicReflector::sort_nodes(
-                                transpose(self.nodes.clone()),
-                                SortKind::Ascending
-                            )
+        self.nodes = match &direction {
+                Direction::North => {
+                    transpose(
+                        ParabolicReflector::sort_nodes(
+                            transpose(self.nodes.clone()),
+                            SortKind::Ascending
                         )
-                    },
-                    Direction::South => {
-                        transpose(
-                            ParabolicReflector::sort_nodes(
-                                transpose(self.nodes.clone()),
-                                SortKind::Descending
-                            )
+                    )
+                },
+                Direction::South => {
+                    transpose(
+                        ParabolicReflector::sort_nodes(
+                            transpose(self.nodes.clone()),
+                            SortKind::Descending
                         )
-                    },
-                    Direction::East => {
-                        ParabolicReflector::sort_nodes(self.nodes.clone(), SortKind::Descending)
-                    },
-                    Direction::West => {
-                        ParabolicReflector::sort_nodes(self.nodes.clone(), SortKind::Ascending)
-                    },
-                };
-
-            self.memo.insert((initial_nodes, direction), self.nodes.clone());
-        }
+                    )
+                },
+                Direction::East => {
+                    ParabolicReflector::sort_nodes(self.nodes.clone(), SortKind::Descending)
+                },
+                Direction::West => {
+                    ParabolicReflector::sort_nodes(self.nodes.clone(), SortKind::Ascending)
+                },
+            };
     }
 
     fn sort_nodes(nodes: Vec<Vec<Node>>, kind: SortKind) -> Vec<Vec<Node>> {
