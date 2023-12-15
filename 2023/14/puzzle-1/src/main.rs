@@ -15,17 +15,9 @@ fn main() {
 
     let mut sum: usize = 0;
 
-
     let moved_input: Vec<Vec<Node>> = transpose(transpose(input)
         .into_iter()
         .map(|row| {
-            let fixed_positions: Vec<usize> = row
-                .iter()
-                .enumerate()
-                .filter(|(_, &node)| node == Node::Fixed)
-                .map(|(index, _)| index)
-                .collect();
-
             let splitted_row = row
                 .split(|node| node == &Node::Fixed)
                 .map(|node_slice| node_slice.to_vec())
