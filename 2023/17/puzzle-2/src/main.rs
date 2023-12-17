@@ -21,7 +21,7 @@ fn main() {
 
     for (row_index, row) in input.iter().enumerate() {
         for (col_index, col) in row.iter().enumerate() {
-            let id = (row_index * number_of_rows) + col_index;
+            let id = (row_index * number_of_cols) + col_index;
             map.insert_node(id, *col);
         }
     }
@@ -34,7 +34,7 @@ fn main() {
 
     for (row_index, row) in input.iter().enumerate() {
         for (col_index, col) in row.iter().enumerate() {
-            let id = (row_index * number_of_rows) + col_index;
+            let id = (row_index * number_of_cols) + col_index;
 
             if shortest_path.0.contains(&id) {
                 let id_position = shortest_path.0.iter().position(|&s| s == id).unwrap();
@@ -48,7 +48,7 @@ fn main() {
                         print!(">");
                     } else if current - previous == -1 {
                         print!("<");
-                    } else if current - previous == number_of_rows as isize {
+                    } else if current - previous == number_of_cols as isize {
                         print!("v");
                     } else if current - previous == -(number_of_rows as isize) {
                         print!("^");
@@ -248,7 +248,7 @@ impl Map {
             for (direction, neighbour) in self.nodes.get(&node_id).unwrap().neighbours_with_boundaries(&self.boundaries, &direction_tracker, &(4..10)) {
                 // println!("\tNeighbour: {:?}", neighbour);
 
-                let neighbour_id = (neighbour.0 * self.boundaries.0.end) + neighbour.1;
+                let neighbour_id = (neighbour.0 * self.boundaries.1.end) + neighbour.1;
 
                 let neighbour_direction_tracker = if direction_tracker.0 == direction {
                     (direction_tracker.0, direction_tracker.1 + 1)
