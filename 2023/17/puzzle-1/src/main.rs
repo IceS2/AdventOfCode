@@ -1,7 +1,7 @@
 use std::{fs, collections::{HashMap, BinaryHeap}, ops::Range, cmp::Ordering};
 
 fn main() {
-    let input: Vec<Vec<Node>> = fs::read_to_string("input.txt").unwrap()
+    let input: Vec<Vec<Node>> = fs::read_to_string("test.txt").unwrap()
         .split('\n')
         .enumerate()
         .map(|(row_index, row)| {
@@ -203,6 +203,12 @@ impl Map {
             node_id: start,
             heat_lost: 0,
             direction_tracker: (Direction::Right, 0)
+        });
+
+        heap.push(State {
+            node_id: start,
+            heat_lost: 0,
+            direction_tracker: (Direction::Down, 0)
         });
 
         while let Some(State { node_id, heat_lost, direction_tracker }) = heap.pop() {

@@ -28,7 +28,7 @@ fn main() {
 
     let shortest_path = map.find_path(0, (number_of_rows * number_of_cols) - 1);
 
-    println!("Shortest Path: {:?}", shortest_path);
+    // println!("Shortest Path: {:?}", shortest_path);
 
     let mut heat_lost_per_node: Vec<(usize, usize)> = vec![];
 
@@ -45,19 +45,19 @@ fn main() {
                     let previous = shortest_path.0[id_position - 1] as isize;
 
                     if current - previous == 1 {
-                        print!("> ");
+                        print!(">");
                     } else if current - previous == -1 {
-                        print!("< ");
+                        print!("<");
                     } else if current - previous == number_of_rows as isize {
-                        print!("v ");
+                        print!("v");
                     } else if current - previous == -(number_of_rows as isize) {
-                        print!("^ ");
+                        print!("^");
                     }
                 } else {
-                    print!("# ");
+                    print!("#");
                 }
             } else {
-                print!("{} ", col.heat_loss);
+                print!("{}", col.heat_loss);
             }
         }
         println!();
@@ -213,11 +213,17 @@ impl Map {
             direction_tracker: (Direction::Right, 0)
         });
 
+        heap.push(State {
+            node_id: start,
+            heat_lost: 0,
+            direction_tracker: (Direction::Down, 0)
+        });
+
         while let Some(State { node_id, heat_lost, direction_tracker }) = heap.pop() {
             let dist_key = DistKey { node_id, direction_tracker };
             // println!("Dist Key: {:?}", dist_key);
 
-            if node_id == end  && direction_tracker.1 >= 4 {
+            if node_id == end && direction_tracker.1 >= 4 {
                 let mut path = vec![];
                 let mut current = dist_key;
 
