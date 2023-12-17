@@ -114,35 +114,45 @@ impl Node {
         current_direction_tracker: &(Direction, usize),
         direction_boundary: &Range<usize>
     ) -> Vec<(Direction, (usize, usize))> {
-        let mut neighbours: Vec<(Direction, (usize, usize))> = vec![];
-
         let x = self.position.0;
         let y = self.position.1;
 
-        if x != 0 && current_direction_tracker.0.opposite() != Direction::Up {
-            if direction_boundary.contains(&current_direction_tracker.1) || (current_direction_tracker.0 == Direction::Up && current_direction_tracker.1 < direction_boundary.start) {
-                neighbours.push((Direction::Up, (x - 1, y)));
-            }
-        }
+        let mut neighbours: Vec<(Direction, (usize, usize))> = vec![];
 
-        if x != grid_boundaries.0.end - 1 && current_direction_tracker.0.opposite() != Direction::Down {
-            if direction_boundary.contains(&current_direction_tracker.1) || (current_direction_tracker.0 == Direction::Down && current_direction_tracker.1 < direction_boundary.start) {
-                neighbours.push((Direction::Down, (x + 1, y)));
-            }
-        }
 
-        if y != 0 && current_direction_tracker.0.opposite() != Direction::Left {
-            if direction_boundary.contains(&current_direction_tracker.1) || (current_direction_tracker.0 == Direction::Left && current_direction_tracker.1 < direction_boundary.start) {
-                neighbours.push((Direction::Left, (x, y - 1)));
-            }
-        }
+        for direction in [
+            Direction::Up,
+            Direction::Left,
+            Direction::Down,
+            Direction::Right,
+        ] {
 
-        if y != grid_boundaries.1.end - 1 && current_direction_tracker.0.opposite() != Direction::Right {
-            if direction_boundary.contains(&current_direction_tracker.1) || (current_direction_tracker.0 == Direction::Right && current_direction_tracker.1 < direction_boundary.start) {
-                neighbours.push((Direction::Right, (x, y + 1)));
-            }
-        }
+            let breaking_conditions: bool = [
+                // Cannot go back in the opposite direction
+                current_direction_tracker.0.opposite() == direction,
 
+                // Cannot walk less than <boundary_start> or more than <boundary_end> steps on the same direction
+                current_direction_tracker.1 == direction_boundary.end && direction == current_direction_tracker.0,
+                current_direction_tracker.1 < direction_boundary.start && direction != current_direction_tracker.0,
+
+                // Cannot leave the grid
+                x == 0 && direction == Direction::Up,
+                x == grid_boundaries.0.end - 1 && direction == Direction::Down,
+                y == 0 && direction == Direction::Left,
+                y == grid_boundaries.1.end - 1 && direction == Direction::Right
+            ].iter().any(|c| *c);
+
+            if breaking_conditions {
+                    continue;
+            }
+
+            match direction {
+                    Direction::Up => neighbours.push((direction, (x - 1, y))),
+                    Direction::Down => neighbours.push((direction, (x + 1, y))),
+                    Direction::Left => neighbours.push((direction, (x, y - 1))),
+                    Direction::Right => neighbours.push((direction, (x, y + 1))),
+                }
+        }
         neighbours
     }
 }

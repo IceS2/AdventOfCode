@@ -28,7 +28,7 @@ fn main() {
 
     let shortest_path = map.find_path(0, (number_of_rows * number_of_cols) - 1);
 
-    println!("Shortest Path: {:?}", shortest_path);
+    // println!("Shortest Path: {:?}", shortest_path);
 
     let mut heat_lost_per_node: Vec<(usize, usize)> = vec![];
 
@@ -45,19 +45,19 @@ fn main() {
                     let previous = shortest_path.0[id_position - 1] as isize;
 
                     if current - previous == 1 {
-                        print!("> ");
+                        print!(">");
                     } else if current - previous == -1 {
-                        print!("< ");
-                    } else if current - previous == number_of_rows as isize {
-                        print!("v ");
+                        print!("<");
+                    } else if current - previous == number_of_cols as isize {
+                        print!("v");
                     } else if current - previous == -(number_of_rows as isize) {
-                        print!("^ ");
+                        print!("^");
                     }
                 } else {
-                    print!("# ");
+                    print!("#");
                 }
             } else {
-                print!("{} ", col.heat_loss);
+                print!("{}", col.heat_loss);
             }
         }
         println!();
@@ -114,27 +114,45 @@ impl Node {
         current_direction_tracker: &(Direction, usize),
         direction_boundary: &Range<usize>
     ) -> Vec<(Direction, (usize, usize))> {
-        let mut neighbours: Vec<(Direction, (usize, usize))> = vec![];
-
         let x = self.position.0;
         let y = self.position.1;
 
-        if x != 0 && (current_direction_tracker.0 != Direction::Up || direction_boundary.contains(&current_direction_tracker.1)) && current_direction_tracker.0.opposite() != Direction::Up {
-            neighbours.push((Direction::Up, (x - 1, y)));
-        }
+        let mut neighbours: Vec<(Direction, (usize, usize))> = vec![];
 
-        if y != 0 && (current_direction_tracker.0 != Direction::Left || direction_boundary.contains(&current_direction_tracker.1)) && current_direction_tracker.0.opposite() != Direction::Left {
-            neighbours.push((Direction::Left, (x, y - 1)));
-        }
 
-        if x != grid_boundaries.0.end - 1 && (current_direction_tracker.0 != Direction::Down || direction_boundary.contains(&current_direction_tracker.1)) && current_direction_tracker.0.opposite() != Direction::Down {
-            neighbours.push((Direction::Down, (x + 1, y)));
-        }
+        for direction in [
+            Direction::Up,
+            Direction::Left,
+            Direction::Down,
+            Direction::Right,
+        ] {
 
-        if x != grid_boundaries.1.end - 1 && (current_direction_tracker.0 != Direction::Right || direction_boundary.contains(&current_direction_tracker.1)) && current_direction_tracker.0.opposite() != Direction::Right {
-            neighbours.push((Direction::Right, (x, y + 1)));
-        }
+            let breaking_conditions: bool = [
+                // Cannot go back in the opposite direction
+                current_direction_tracker.0.opposite() == direction,
 
+                // Cannot walk less than <boundary_start> or more than <boundary_end> steps on the same direction
+                current_direction_tracker.1 == direction_boundary.end && direction == current_direction_tracker.0,
+                current_direction_tracker.1 < direction_boundary.start && direction != current_direction_tracker.0,
+
+                // Cannot leave the grid
+                x == 0 && direction == Direction::Up,
+                x == grid_boundaries.0.end - 1 && direction == Direction::Down,
+                y == 0 && direction == Direction::Left,
+                y == grid_boundaries.1.end - 1 && direction == Direction::Right
+            ].iter().any(|c| *c);
+
+            if breaking_conditions {
+                    continue;
+            }
+
+            match direction {
+                    Direction::Up => neighbours.push((direction, (x - 1, y))),
+                    Direction::Down => neighbours.push((direction, (x + 1, y))),
+                    Direction::Left => neighbours.push((direction, (x, y - 1))),
+                    Direction::Right => neighbours.push((direction, (x, y + 1))),
+                }
+        }
         neighbours
     }
 }
@@ -238,8 +256,6 @@ impl Map {
             }
 
             for (direction, neighbour) in self.nodes.get(&node_id).unwrap().neighbours_with_boundaries(&self.boundaries, &direction_tracker, &(0..3)) {
-                // println!("\tNeighbour: {:?}", neighbour);
-
                 let neighbour_id = (neighbour.0 * self.boundaries.1.end) + neighbour.1;
 
                 let neighbour_direction_tracker = if direction_tracker.0 == direction {
