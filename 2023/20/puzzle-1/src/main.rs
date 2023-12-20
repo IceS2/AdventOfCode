@@ -1,4 +1,4 @@
-use std::{fs, collections::HashMap, cell::RefCell};
+use std::{fs, collections::{HashMap, VecDeque}, cell::RefCell};
 use regex::Regex;
 
 fn main() {
@@ -58,12 +58,12 @@ fn main() {
     let mut high_pulses: i32 = 0;
 
 
-    for i in 0..1000 {
+    for _ in 0..1000 {
         // println!("Iteration: {:?}", i + 1);
         // println!("{}\n", "-".repeat(60));
-        let mut pulses = initial_pulse.clone();
+        let mut pulses: VecDeque<_> = initial_pulse.clone().into();
 
-        while let Some(pulse_to_send) = pulses.pop() {
+        while let Some(pulse_to_send) = pulses.pop_front() {
             let (source, destination, pulse) = pulse_to_send;
 
             match pulse {
@@ -75,7 +75,7 @@ fn main() {
             if let Some(module) = modules.get(&destination) {
                 if let Some((new_destination_modules, new_pulse)) = module.handle(source, pulse) {
                     for new_destination in new_destination_modules {
-                        pulses.push((destination.clone(), new_destination.to_string(), new_pulse.clone()));
+                        pulses.push_back((destination.clone(), new_destination.to_string(), new_pulse.clone()));
                     }
                 }
             }
