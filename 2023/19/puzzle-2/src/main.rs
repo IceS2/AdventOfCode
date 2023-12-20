@@ -1,4 +1,4 @@
-use std::{fs, collections::HashMap};
+use std::{fs, collections::HashMap, ops::Range};
 use regex::Regex;
 
 fn main() {
@@ -14,73 +14,66 @@ fn main() {
         .map(|w| (w.name.clone(), w))
         .collect();
 
-    let part_ratings: Vec<PartRating> = input[1]
-        .split('\n')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.into())
-        .collect();
+    let initial_part_rating_range: PartRatingRange = PartRatingRange {
+        x: 1..4001,
+        m: 1..4001,
+        a: 1..4001,
+        s: 1..4001,
+    };
 
+    let mut state = vec![WorkflowResponse::Routed((initial_part_rating_range, "in".to_string()))];
+    let mut valid_ranges: Vec<PartRatingRange> = vec![];
 
-    let mut sum: usize = 0;
-
-    for part_rating in part_ratings {
-        let mut response: WorkflowResponse = WorkflowResponse::Routed("in".to_string());
-
-        while let WorkflowResponse::Routed(workflow) = response {
-            response = workflows[&workflow].run(&part_rating);
-        }
-
-        if response == WorkflowResponse::Accepted {
-            sum += part_rating.x + part_rating.m + part_rating.a + part_rating.s;
+    while let Some(head) = state.pop() {
+        match head {
+            WorkflowResponse::Routed((part_rating_range, workflow)) => {
+                state.append(&mut workflows[&workflow].run(&part_rating_range));
+            },
+            WorkflowResponse::Refused(_) => {
+                continue;
+            },
+            WorkflowResponse::Accepted(part_rating_range) => {
+                valid_ranges.push(part_rating_range);
+            },
         }
     }
 
-    println!("Sum: {:?}", sum);
+    println!("Valid ranges: {:?}", valid_ranges);
+
+    let combinations = valid_ranges.iter().fold(0, |acc, valid_range| {
+        acc + (valid_range.x.len() * (valid_range.m.len()) * (valid_range.a.len()) * (valid_range.s.len()))
+    });
+
+
+    println!("Combinations: {:?}", combinations);
 
 }
 
-#[derive(Debug)]
-struct PartRating {
-    x: usize,
-    m: usize,
-    a: usize,
-    s: usize,
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PartRatingRange {
+    x: Range<usize>,
+    m: Range<usize>,
+    a: Range<usize>,
+    s: Range<usize>,
 }
 
-impl PartRating {
-    fn get_rating(&self, category: &Category) -> usize {
+impl PartRatingRange {
+    fn get_rating_range(&self, category: &Category) -> Range<usize> {
         match category {
-            Category::X => self.x,
-            Category::M => self.m,
-            Category::A => self.a,
-            Category::S => self.s
+            Category::X => self.x.clone(),
+            Category::M => self.m.clone(),
+            Category::A => self.a.clone(),
+            Category::S => self.s.clone(),
         }
     }
-}
 
-impl From<&str> for PartRating {
-    fn from(s: &str) -> Self {
-        let splitted: Vec<(char, usize)> = s[1..s.len() - 1]
-            .split(',')
-            .map(|rate|
-                rate
-                    .split('=')
-                    .collect::<Vec<&str>>()
-            )
-            .map(|rate| (
-                rate[0].chars().next().unwrap(),
-                rate[1].parse().unwrap()
-            ))
-            .collect();
-
-        let map: HashMap<char, usize> = splitted.into_iter().collect();
-
-        Self {
-            x: map[&'x'],
-            m: map[&'m'],
-            a: map[&'a'],
-            s: map[&'s'],
-        }
+    fn set_rating_range(&mut self, category: &Category, range: Range<usize>) {
+        match category {
+            Category::X => self.x = range,
+            Category::M => self.m = range,
+            Category::A => self.a = range,
+            Category::S => self.s = range,
+        };
     }
 }
 
@@ -131,30 +124,108 @@ struct Rule {
 }
 
 impl Rule {
-    fn apply(&self, part_rating: &PartRating) -> Option<String> {
+    fn apply(&self, part_rating_range: &PartRatingRange) -> Option<(PartRatingRange, String)> {
         match self.operator {
             Some(Operator::LesserThan) => {
-                if part_rating.get_rating(self.category.as_ref().unwrap()) < self.value.unwrap() {
-                    Some(self.if_true.clone())
-                } else {
+                let range = part_rating_range.get_rating_range(self.category.as_ref().unwrap());
+                let value = self.value.unwrap();
+
+                if range.start > value || range.end <= value {
                     None
+                } else {
+                    let mut new_part_rating_range: PartRatingRange = part_rating_range.clone();
+                    new_part_rating_range.set_rating_range(self.category.as_ref().unwrap(), range.start..value);
+
+                    Some((new_part_rating_range, self.if_true.clone()))
                 }
             },
             Some(Operator::GreaterThan) => {
-                if part_rating.get_rating(self.category.as_ref().unwrap()) > self.value.unwrap() {
-                    Some(self.if_true.clone())
-                } else {
+                let range = part_rating_range.get_rating_range(self.category.as_ref().unwrap());
+                let value = self.value.unwrap();
+
+                if range.start > value || range.end <= value {
                     None
+                } else {
+                    let mut new_part_rating_range: PartRatingRange = part_rating_range.clone();
+                    new_part_rating_range.set_rating_range(self.category.as_ref().unwrap(), value + 1..range.end);
+
+                    Some((new_part_rating_range, self.if_true.clone()))
                 }
             },
             Some(Operator::EqualTo) => {
-                if part_rating.get_rating(self.category.as_ref().unwrap()) == self.value.unwrap() {
-                    Some(self.if_true.clone())
-                } else {
+                let range = part_rating_range.get_rating_range(self.category.as_ref().unwrap());
+                let value = self.value.unwrap();
+
+                if range.start > value || range.end <= value {
                     None
+                } else {
+                    let mut new_part_rating_range: PartRatingRange = part_rating_range.clone();
+                    new_part_rating_range.set_rating_range(self.category.as_ref().unwrap(), value..value + 1);
+
+                    Some((new_part_rating_range, self.if_true.clone()))
                 }
             },
-            None => Some(self.if_true.clone())
+            None => Some((part_rating_range.clone(), self.if_true.clone()))
+        }
+    }
+
+    fn get_rating_range_for_which_it_does_not_apply(
+        &self,
+        part_rating_range: &PartRatingRange
+    ) -> Option<Vec<PartRatingRange>> {
+
+        match self.operator {
+            Some(Operator::LesserThan) => {
+                let range = part_rating_range.get_rating_range(self.category.as_ref().unwrap());
+                let value = self.value.unwrap();
+
+                if range.start > value || range.end <= value {
+                    Some(vec![part_rating_range.clone()])
+                } else {
+                    let mut new_part_rating_range: PartRatingRange = part_rating_range.clone();
+                    new_part_rating_range.set_rating_range(self.category.as_ref().unwrap(), value..range.end);
+
+                    Some(vec![new_part_rating_range])
+                }
+            },
+            Some(Operator::GreaterThan) => {
+                let range = part_rating_range.get_rating_range(self.category.as_ref().unwrap());
+                let value = self.value.unwrap();
+
+                if range.start > value || range.end <= value {
+                    Some(vec![part_rating_range.clone()])
+                } else {
+                    let mut new_part_rating_range: PartRatingRange = part_rating_range.clone();
+                    new_part_rating_range.set_rating_range(self.category.as_ref().unwrap(), range.start..value + 1);
+
+                    Some(vec![new_part_rating_range])
+                }
+            },
+            Some(Operator::EqualTo) => {
+                let range = part_rating_range.get_rating_range(self.category.as_ref().unwrap());
+                let value = self.value.unwrap();
+
+                if range.start > value || range.end <= value {
+                    Some(vec![part_rating_range.clone()])
+                } else if range.start == value && range.end == value + 1 {
+                    None
+                } else {
+                    let mut new_part_rating_range_below: PartRatingRange = part_rating_range.clone();
+                    new_part_rating_range_below.set_rating_range(
+                        self.category.as_ref().unwrap(),
+                        range.start..value
+                    );
+
+                    let mut new_part_rating_range_above: PartRatingRange = part_rating_range.clone();
+                    new_part_rating_range_above.set_rating_range(
+                        self.category.as_ref().unwrap(),
+                        value + 1..range.end
+                    );
+
+                    Some(vec![new_part_rating_range_below, new_part_rating_range_above])
+                }
+            },
+            None => None
         }
     }
 }
@@ -184,9 +255,9 @@ impl From<&str> for Rule {
 
 #[derive(Debug, PartialEq, Eq)]
 enum WorkflowResponse {
-    Accepted,
-    Refused,
-    Routed(String)
+    Accepted(PartRatingRange),
+    Refused(PartRatingRange),
+    Routed((PartRatingRange, String))
 }
 
 #[derive(Debug)]
@@ -196,21 +267,47 @@ struct Workflow {
 }
 
 impl Workflow {
-    fn run(&self, part_rating: &PartRating) -> WorkflowResponse {
+    fn run(&self, part_rating_range: &PartRatingRange) -> Vec<WorkflowResponse> {
+        let mut results: Vec<WorkflowResponse> = vec![];
+        let mut part_rating_ranges_left: Vec<PartRatingRange> = vec![part_rating_range.clone()];
+
         for idx in 0..self.rules.len() {
-            match self.rules[&idx].apply(&part_rating) {
-                None => { continue; },
-                Some(answer) => {
-                    let response = match answer.as_str() {
-                        "R" => WorkflowResponse::Refused,
-                        "A" => WorkflowResponse::Accepted,
-                        workflow => WorkflowResponse::Routed(workflow.to_string())
-                    };
-                    return response;
+            for part_rating_range_to_apply in &part_rating_ranges_left {
+                match self.rules[&idx].apply(part_rating_range_to_apply) {
+                    None => { continue; },
+                    Some(answer) => {
+                        let (new_part_rating_range, response) = answer;
+
+                        match response.as_str() {
+                            "R" => {
+                                results.push(WorkflowResponse::Refused(new_part_rating_range))
+                            },
+                            "A" => {
+                                results.push(WorkflowResponse::Accepted(new_part_rating_range))
+                            },
+                            workflow => {
+                                results.push(WorkflowResponse::Routed((new_part_rating_range, workflow.to_string())))
+                            }
+                        };
+                    }
                 }
             }
+
+            let mut new_part_rating_ranges_left: Vec<PartRatingRange> = vec![];
+
+            for part_rating_range_left in part_rating_ranges_left {
+                match self.rules[&idx].get_rating_range_for_which_it_does_not_apply(&part_rating_range_left) {
+                    None => { continue; },
+                    Some(mut new_part_rating_ranges) => {
+                        new_part_rating_ranges_left.append(&mut new_part_rating_ranges)
+                    }
+                }
+
+            }
+
+            part_rating_ranges_left = new_part_rating_ranges_left;
         }
-        unreachable!();
+        results
     }
 }
 
