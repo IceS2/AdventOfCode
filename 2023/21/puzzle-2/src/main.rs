@@ -1,4 +1,4 @@
-use std::{fs, ops::Range, collections::{HashSet, HashMap}};
+use std::{fs, ops::Range, collections::{HashSet, HashMap, VecDeque}};
 
 fn main() {
     let input: Vec<Vec<Node>> = fs::read_to_string("test.txt").unwrap()
@@ -29,13 +29,22 @@ fn main() {
         .into();
 
     let gardens: Gardens = Gardens::new(input, start);
-    for step in [6, 10, 50, 100, 500, 1000, 5000] {
-        let result = gardens.walk(step);
-        println!("{:?}", result.len());
+    // for step in [6, 10, 50, 100, 500, 1000, 5000] {
+    //     let result = gardens.walk(step);
+    //     println!("{:?}", result.len());
+    //
+    //     let new_result = gardens.count_reachable_garden_plots(step);
+    //     println!("{:?}", new_result - new_result2);
+    // }
+    let mut result = 1;
+    let steps = 100;
+    for i in (0..steps).step_by(2) {
+        result += gardens.count_reachable_garden_plots(steps - i);
     }
-    // let result = gardens.walk(50);
-    // println!("{:#?}", result);
-    // println!("{:?}", result.len());
+    for i in (0..steps).step_by(2) {
+        result -= gardens.count_reachable_garden_plots(steps - (i + 1));
+    }
+    println!("{:#?}", result);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -172,5 +181,36 @@ impl Gardens {
 
         }
         current_positions
+    }
+
+    fn count_reachable_garden_plots(&self, steps: usize) -> usize {
+        let mut queue: VecDeque<(Position, usize)> = VecDeque::new();
+        queue.push_back((self.start, steps));
+
+        let mut visited = HashSet::new();
+
+        while let Some((position, remaining_steps)) = queue.pop_front() {
+            if visited.contains(&position) {
+                continue;
+            }
+
+            visited.insert(position);
+
+            if remaining_steps == 0 {
+                continue;
+            }
+
+            let neighbours: Vec<Position> = position.neighbours(&self.boundary)
+                .iter()
+                .filter(|pos| self.gardens[pos.x][pos.y].node_type != NodeType::Rock)
+                .copied()
+                .collect();
+
+            for neighbour in neighbours {
+                queue.push_back((neighbour, remaining_steps - 1));
+            }
+        }
+
+        visited.len()
     }
 }
