@@ -1,7 +1,9 @@
-use std::{fs, ops::Range, collections::{HashSet, HashMap, VecDeque}};
+// Thanks villuna for this explanation
+// https://github.com/villuna/aoc23/wiki/A-Geometric-solution-to-advent-of-code-2023,-day-21
+use std::{fs, ops::Range, collections::{HashMap, VecDeque}};
 
 fn main() {
-    let input: Vec<Vec<Node>> = fs::read_to_string("test.txt").unwrap()
+    let input: Vec<Vec<Node>> = fs::read_to_string("input.txt").unwrap()
         .split('\n')
         .filter(|row| !row.is_empty())
         .enumerate()
@@ -29,21 +31,9 @@ fn main() {
         .into();
 
     let gardens: Gardens = Gardens::new(input, start);
-    // for step in [6, 10, 50, 100, 500, 1000, 5000] {
-    //     let result = gardens.walk(step);
-    //     println!("{:?}", result.len());
-    //
-    //     let new_result = gardens.count_reachable_garden_plots(step);
-    //     println!("{:?}", new_result - new_result2);
-    // }
-    let mut result = 1;
-    let steps = 100;
-    for i in (0..steps).step_by(2) {
-        result += gardens.count_reachable_garden_plots(steps - i);
-    }
-    for i in (0..steps).step_by(2) {
-        result -= gardens.count_reachable_garden_plots(steps - (i + 1));
-    }
+
+    let result = gardens.walk(10);
+
     println!("{:#?}", result);
 }
 
@@ -51,7 +41,6 @@ fn main() {
 struct Position {
     x: usize,
     y: usize,
-    quadrant: (isize, isize)
 }
 
 impl From<(usize, usize)> for Position {
@@ -59,14 +48,12 @@ impl From<(usize, usize)> for Position {
         Self {
             x: p.0,
             y: p.1,
-            quadrant: (0, 0)
         }
     }
 }
 
 impl Position {
     fn neighbours(&self, boundary: &(Range<isize>, Range<isize>)) -> Vec<Position> {
-        let quadrant = self.quadrant;
         vec![
             (self.x as isize - 1, self.y as isize),
             (self.x as isize + 1, self.y as isize),
@@ -74,39 +61,8 @@ impl Position {
             (self.x as isize, self.y as isize + 1),
         ]
             .into_iter()
-            .map(|(x, y)| {
-                    if x == -1 {
-                        Position {
-                            x: (boundary.0.end - 1) as usize,
-                            y: y as usize,
-                            quadrant: (quadrant.0 - 1, quadrant.1)
-                        }
-                    } else if x == boundary.0.end {
-                        Position {
-                            x: 0,
-                            y: y as usize,
-                            quadrant: (quadrant.0 + 1, quadrant.1)
-                        }
-                    } else if y == -1 {
-                        Position {
-                            x: x as usize,
-                            y: (boundary.1.end - 1) as usize,
-                            quadrant: (quadrant.0, quadrant.1 - 1)
-                        }
-                    } else if y == boundary.1.end {
-                        Position {
-                            x: x as usize,
-                            y: 0,
-                            quadrant: (quadrant.0, quadrant.1 + 1)
-                        }
-                    } else {
-                        Position {
-                            x: x as usize,
-                            y: y as usize,
-                            quadrant
-                        }
-                    }
-            })
+            .filter(|(x, y)| boundary.0.contains(x) && boundary.1.contains(y))
+            .map(|(x, y)| Position { x: x as usize, y: y as usize })
             .collect()
     }
 }
@@ -138,7 +94,7 @@ struct Node {
 impl Node {
     fn new(x: usize, y: usize, c: char) -> Self {
         Self {
-            position: Position { x, y , quadrant: (0, 0)},
+            position: Position { x, y },
             node_type: c.into()
         }
     }
@@ -162,55 +118,66 @@ impl Gardens {
         }
     }
 
-    fn walk(&self, steps: usize) -> HashSet<Position> {
-        let mut current_positions: HashSet<Position> =  HashSet::from([self.start]);
+    fn walk(&self, steps: usize) -> usize{
+        let mut to_check: VecDeque::<(Position, usize)> = VecDeque::new();
+        let mut visited: HashMap<Position, usize> = HashMap::new();
 
-        for _ in 0..steps {
-            let mut new_positions: HashSet<Position> = HashSet::new();
-            for cur_pos in &current_positions {
-                let neighbours: Vec<Position> = cur_pos.neighbours(&self.boundary)
-                    .iter()
-                    .filter(|pos| self.gardens[pos.x][pos.y].node_type != NodeType::Rock)
-                    .copied()
-                    .collect();
-                for neighbour in neighbours {
-                    new_positions.insert(neighbour);
-                }
-            }
-            current_positions = new_positions;
+        to_check.push_back((self.start, 0));
 
-        }
-        current_positions
-    }
-
-    fn count_reachable_garden_plots(&self, steps: usize) -> usize {
-        let mut queue: VecDeque<(Position, usize)> = VecDeque::new();
-        queue.push_back((self.start, steps));
-
-        let mut visited = HashSet::new();
-
-        while let Some((position, remaining_steps)) = queue.pop_front() {
-            if visited.contains(&position) {
+        while let Some((pos, dist)) = to_check.pop_front() {
+            if visited.contains_key(&pos) {
                 continue;
             }
 
-            visited.insert(position);
+            visited.insert(pos, dist);
 
-            if remaining_steps == 0 {
-                continue;
-            }
-
-            let neighbours: Vec<Position> = position.neighbours(&self.boundary)
+            let neighbours: Vec<Position> = pos.neighbours(&self.boundary)
                 .iter()
                 .filter(|pos| self.gardens[pos.x][pos.y].node_type != NodeType::Rock)
                 .copied()
                 .collect();
 
             for neighbour in neighbours {
-                queue.push_back((neighbour, remaining_steps - 1));
+                if !visited.contains_key(&neighbour) {
+                    to_check.push_back((neighbour, dist + 1));
+                }
             }
         }
 
-        visited.len()
+        if steps > 64 {
+            let even_corners = visited
+                .values()
+                .filter(|v| **v % 2 == 0 && **v > 65)
+                .count();
+            let odd_corners = visited
+                .values()
+                .filter(|v| **v % 2 == 1 && **v > 65)
+                .count();
+
+            let n = (steps - ( self.boundary.0.len() / 2)) / self.boundary.0.len();
+
+            let even = if n % 2 == 0 { n * n } else { (n + 1) * (n + 1) };
+            let odd = if n % 2 == 0 { (n + 1) * (n + 1) } else { n * n };
+
+            odd * visited.values().filter(|v| **v % 2 == 1).count()
+                + even * visited.values().filter(|v| **v % 2 == 0).count()
+                - ((n + 1) * odd_corners)
+                + (n * even_corners)
+        } else {
+            match steps % 2 {
+                0 => {
+                    visited
+                        .values()
+                        .filter(|v| **v <= steps && **v % 2 == 0)
+                        .count()
+                }
+                _ => {
+                    visited
+                        .values()
+                        .filter(|v| **v <= steps && **v % 2 != 0)
+                        .count()
+                }
+            }
+        }
     }
 }
